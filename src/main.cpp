@@ -10,6 +10,8 @@
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 
+float currentTemperature = 0.0;
+
 // GPIO where the DS18B20 is connected to
 const int oneWireBus = 4;     
 
@@ -25,21 +27,59 @@ const char* password = "98806829";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
 String readBME280Temperature() {
   // Read temperature as Celsius (the default)
   float t = sensors.getTempCByIndex(0);
-  // Convert temperature to Fahrenheit
-  //t = 1.8 * t + 32;
   if (isnan(t)) {    
-    Serial.println("Failed to read from BME280 sensor!");
-    return "";
+    Serial.println("Failed to read from DS18B20 sensor!");
   }
   else {
-    Serial.println(t);
-    return String(t);
+    currentTemperature = t; // Update the current temperature
   }
+  return String(currentTemperature);
 }
+
+void sendTemperatureToClients() {
+  String temperatureData = String(currentTemperature);
+  ws.textAll(temperatureData);
+}
+
+// //besked fra client to server
+// void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+//   AwsFrameInfo *info = (AwsFrameInfo *)arg;
+//   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+//     // Handle WebSocket message here if needed
+
+//   }
+// }
+
+// //handler alle event der sker i websocket
+// void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+//              void *arg, uint8_t *data, size_t len) {
+//   switch (type) {
+//     case WS_EVT_CONNECT:
+//       Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+//       break;
+//     case WS_EVT_DISCONNECT:
+//       Serial.printf("WebSocket client #%u disconnected\n", client->id());
+//       break;
+//     case WS_EVT_DATA:
+//       handleWebSocketMessage(arg, data, len);
+//       break;
+//     case WS_EVT_PONG:
+//     case WS_EVT_ERROR:
+//       break;
+//   }
+// }
+
+//starter websocket
+void initWebSocket() {
+  //ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
 
 void setup() {
   // Start the Serial Monitor
@@ -64,6 +104,8 @@ void setup() {
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
 
+  initWebSocket();
+
 // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/index.html");
@@ -81,11 +123,12 @@ void setup() {
 void loop() {
   sensors.requestTemperatures(); 
   float temperatureC = sensors.getTempCByIndex(0);
-  //float temperatureF = sensors.getTempFByIndex(0);
-  Serial.print(temperatureC);
+  if (!isnan(temperatureC) && currentTemperature != temperatureC) {
+    currentTemperature = temperatureC;
+  sendTemperatureToClients(); // Send temperature data to clients
+  Serial.print(currentTemperature);
   Serial.println("ºC");
-  //Serial.print(temperatureF);
-  //Serial.println("ºF");
+  }
   delay(1000);
 }
 
