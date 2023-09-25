@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <h2>ESP Weather Station</h2>
+  <h2>ESP Weather Station2</h2>
   <div id="chart-temperature" class="container"></div>
   <div id="chart-humidity" class="container"></div>
   <div id="chart-pressure" class="container"></div>
@@ -48,7 +48,7 @@ var chartT = new Highcharts.Chart({
   credits: { enabled: false }
 });
 
-var socket = new WebSocket("ws://192.168.0.182/ws");
+var socket = new WebSocket("ws://192.168.0.220/ws");
 
 socket.onmessage = function(event) {
   var x = (new Date()).getTime();
