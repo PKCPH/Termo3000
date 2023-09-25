@@ -228,7 +228,7 @@ void setup() {
   
   // Start deep sleep
   Serial.println("DONE! Going to sleep now.");
-  esp_deep_sleep_start();
+  //esp_deep_sleep_start();
 
 }
 
