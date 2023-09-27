@@ -1,8 +1,3 @@
-/*********
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com
-*********/
-
 #include <Arduino.h>
 // DS18B20 libraries
 #include <OneWire.h>
@@ -65,8 +60,6 @@ String dayStamp;
 String timeStamp;
 
 // Replace with your network credentials
-// const char* ssid = "E308";
-// const char* password = "98806829";
 const char *ssid = "Spiderman";
 const char *password = "@C4mpD3tS3jl3r!";
 
@@ -292,7 +285,7 @@ void loop()
     Serial.println("Going to sleep now.");
     esp_deep_sleep_start();
   }
-  // Check if a minute (60,000 milliseconds) has passed since the last execution
+  // Check if a 10 seconds has passed since the last execution
   if (millis() - lastExecutionTime >= 12000)
   {
     // 1 minute has passed, so execute your code
@@ -391,6 +384,5 @@ void logSDCard()
                 String(currentTemperature) + "\r\n";
   Serial.print("Save data: ");
   Serial.println(dataMessage);
-  /////////////////////////////////////////////////////////////
   appendFile(SD, "/data.txt", dataMessage.c_str());
 }
