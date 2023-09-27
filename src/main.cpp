@@ -36,7 +36,7 @@ const int oneWireBus = 4;
 // Define deep sleep options
 uint64_t uS_TO_S_FACTOR = 1000000; // Conversion factor for micro seconds to seconds
 // Sleep for 10 minutes = 600 seconds
-uint64_t TIME_TO_SLEEP = 6;
+uint64_t TIME_TO_SLEEP = 600;
 // Define CS pin for the SD card module
 #define SD_CS 5
 // Save reading number on RTC memory
@@ -45,7 +45,7 @@ RTC_DATA_ATTR int readingID = 0;
 String dataMessage;
 
 unsigned long startMillis;
-const unsigned long sleepDuration = 300000; // 5 minutes in milliseconds
+const unsigned long sleepDuration = 10000; // 5 minutes in milliseconds
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
@@ -72,6 +72,15 @@ const char *password = "@C4mpD3tS3jl3r!";
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
+
+#define BUTTON_PIN 14
+
+void configureButtonWakeup()
+{
+  // Configure the button pin as an RTC wake-up source
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, LOW);
+  // Set the wake-up level to LOW, so the button press triggers the wake-up
+}
 
 String readBME280Temperature()
 {
@@ -131,6 +140,9 @@ void initWebSocket()
 
 void setup()
 {
+// Initialize the button as a wakeup source
+  configureButtonWakeup();
+
   // Start the Serial Monitor
   Serial.begin(115200);
 
@@ -249,6 +261,8 @@ void setup()
   // Increment readingID on every new reading
   readingID++;
 
+
+  Serial.println("ReadingId");
   // Initialize your setup code here
 
   // Record the start time
@@ -257,11 +271,19 @@ void setup()
 
 void loop()
 {
+  Serial.println("Entering Loop");
+   // Check if the button is pressed
+  if (digitalRead(BUTTON_PIN) == LOW)
+  {
+    // Button is pressed, initiate deep sleep
+    Serial.println("Button pressed! Going to sleep now.");
+    esp_deep_sleep_start();
+  }
+
   // Check if 5 minutes (300,000 milliseconds) have passed
   if (millis() - startMillis >= sleepDuration)
   {
     // 5 minutes have passed, so initiate deep sleep
-    // Start deep sleep
     Serial.println("DONE! Going to sleep now.");
     esp_deep_sleep_start();
   }
