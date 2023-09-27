@@ -1,5 +1,6 @@
 <!DOCTYPE HTML>
 <html>
+
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -10,6 +11,7 @@
       height: 400px;
       margin: 0 auto;
     }
+
     h2 {
       font-family: Arial;
       font-size: 2.5rem;
@@ -17,70 +19,60 @@
     }
   </style>
 </head>
+
 <body>
   <h2>ESP Weather Station2</h2>
   <div id="chart-temperature" class="container"></div>
   <div id="chart-humidity" class="container"></div>
   <div id="chart-pressure" class="container"></div>
-  <input type="file" id="csv-file-input" accept=".csv">
-</body>
-<script>
-var chartT = new Highcharts.Chart({
-  chart: { renderTo: 'chart-temperature' },
-  title: { text: 'BME280 Temperature' },
-  series: [{
-    showInLegend: false,
-    data: []
-  }],
-  plotOptions: {
-    line: {
-      animation: false,
-      dataLabels: { enabled: true }
-    },
-    series: { color: '#059e8a' }
-  },
-  xAxis: {
-    type: 'datetime',
-    dateTimeLabelFormats: { second: '%H:%M:%S' }
-  },
-  yAxis: {
-    title: { text: 'Temperature (Celsius)' }
-    //title: { text: 'Temperature (Fahrenheit)' }
-  },
-  credits: { enabled: false }
+  <input type="file" id="txt-file-input" accept=".txt">
+
+  <!-- Add a download button -->
+  <button id="downloadButton">Download CSV</button>
+
+  <script>
+    var chartT = new Highcharts.Chart({
+      chart: { renderTo: 'chart-temperature' },
+      title: { text: 'BME280 Temperature' },
+      series: [{
+        showInLegend: false,
+        data: []
+      }],
+      plotOptions: {
+        line: {
+          animation: false,
+          dataLabels: { enabled: true }
+        },
+        series: { color: '#059e8a' }
+      },
+      xAxis: {
+        type: 'datetime',
+        dateTimeLabelFormats: { second: '%H:%M:%S' }
+      },
+      yAxis: {
+        title: { text: 'Temperature (Celsius)' }
+      },
+      credits: { enabled: false }
+    });
+    document.getElementById("downloadButton").addEventListener("click", function() {
+  fetch("http://192.168.0.220/downloadCSV", { // Replace with your Arduino's endpoint URL
+    method: "GET",
+  })
+  .then(response => response.blob())
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "data.csv"; // The filename you want to give to the downloaded file
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+  })
+  .catch(error => {
+    console.error("Error downloading CSV:", error);
+  });
 });
+  </script>
+</body>
 
-document.getElementById("csv-file-input").addEventListener("change", handleFileSelect);
-
-function handleFileSelect(event) {
-  var file = event.target.files[0];
-  var reader = new FileReader();
-
-  reader.onload = function(e) {
-    var contents = e.target.result;
-    var dataFromCSV = parseCSV(contents);
-    chartT.series[0].setData(dataFromCSV);
-  };
-
-  reader.readAsText(file);
-}
-
-function parseCSV(csv) {
-  var lines = csv.split("\n");
-  var data = [];
-
-  for (var i = 1; i < lines.length; i++) { // Start from 1 to skip the header row
-    var parts = lines[i].split(",");
-    if (parts.length === 2) {
-      var timestamp = Date.parse(parts[0]);
-      var value = parseFloat(parts[1]);
-      if (!isNaN(timestamp) && !isNaN(value)) {
-        data.push([timestamp, value]);
-      }
-    }
-  }
-
-  return data;
-}
-</script>
 </html>
