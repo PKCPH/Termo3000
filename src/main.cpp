@@ -21,20 +21,19 @@
 #include <SD.h>
 #include <SPI.h>
 
-// function declared
+// Function Prototypes
 void getReadings();
 void getTimeStamp();
 void logSDCard();
 void writeFile(fs::FS &fs, const char *path, const char *message);
 void appendFile(fs::FS &fs, const char *path, const char *message);
-// void send();
 
 // GPIO where the DS18B20 is connected to
 const int oneWireBus = 4;
 
 //////////SDCard
 // Define deep sleep options
-uint64_t uS_TO_S_FACTOR = 1000000; // Conversion factor for micro seconds to seconds
+uint64_t uS_TO_S_FACTOR = 1000000; // Conversion factor for microseconds to seconds
 // Sleep for 10 minutes = 600 seconds
 uint64_t TIME_TO_SLEEP = 600;
 // Define CS pin for the SD card module
@@ -57,7 +56,7 @@ DallasTemperature sensors(&oneWire);
 
 float currentTemperature = 0.0;
 
-// getting time
+// Getting time
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 // Variables to save date and time
@@ -105,7 +104,7 @@ void sendTemperatureToClients()
   ws.textAll(temperatureData);
 }
 
-// besked fra client to server
+// Message from client to server
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 {
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
@@ -115,7 +114,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
   }
 }
 
-// handler alle event der sker i websocket
+// Handle all events that occur in the WebSocket
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
              void *arg, uint8_t *data, size_t len)
 {
@@ -136,10 +135,10 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   }
 }
 
-// starter websocket
+// Initialize WebSocket
 void initWebSocket()
 {
-  // ws.onEvent(onEvent);
+  ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
 
@@ -163,7 +162,7 @@ void setup()
   Serial.println("");
   Serial.println("WiFi connected.");
 
-  // Initialize a NTPClient to get time
+  // Initialize an NTPClient to get time
   timeClient.begin();
   // Set offset time in seconds to adjust for your timezone, for example:
   // GMT +1 = 3600
@@ -220,7 +219,7 @@ void setup()
   File file = SD.open("/data.txt");
   if (!file)
   {
-    Serial.println("File doens't exist");
+    Serial.println("File doesn't exist");
     Serial.println("Creating file...");
     writeFile(SD, "/data.txt", "Reading ID, Date, Hour, Temperature \r\n");
   }
@@ -250,19 +249,26 @@ void setup()
                 request->send(404, "text/plain", "File not found");
               }
             });
-  server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request)
-            {
+server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request){
   // Check if the file exists
   if (SD.exists("/data.txt")) {
     // Remove (delete) the file
     if (SD.remove("/data.txt")) {
-      request->send(200, "text/plain", "Data cleared successfully");
+      // Create a new empty file with the same name
+      File newFile = SD.open("/data.txt", FILE_WRITE);
+      if (newFile) {
+        newFile.close();
+        request->send(200, "text/plain", "Data cleared successfully");
+      } else {
+        request->send(500, "text/plain", "Failed to create new data file");
+      }
     } else {
       request->send(500, "text/plain", "Failed to clear data");
     }
   } else {
     request->send(404, "text/plain", "File not found");
-  } });
+  }
+});
 
   // Start server
   server.begin();
@@ -273,33 +279,17 @@ void setup()
   // Start the DallasTemperature library
   sensors.begin();
 
-  // //gets reading, timestamps and logs onto sdcard
-  // getReadings();
-  // getTimeStamp();
-  // logSDCard();
-
-  // // Increment readingID on every new reading
-  // readingID++;
   // Record the start time
   startMillis = millis();
 }
 
 void loop()
 {
-
-  // Check if the button is pressed
-  if (digitalRead(BUTTON_PIN) == LOW)
-  {
-    // Button is pressed, initiate deep sleep
-    Serial.println("Button pressed! Going to sleep now.");
-    esp_deep_sleep_start();
-  }
-
-  // Check if 5 minutes (300,000 milliseconds) have passed
-  if (millis() - startMillis >= sleepDuration)
+  // Check if 5 minutes (300,000 milliseconds) have passed or button is pressed
+  if (millis() - startMillis >= sleepDuration || digitalRead(BUTTON_PIN) == LOW)
   {
     // 5 minutes have passed, so initiate deep sleep
-    Serial.println("DONE! Going to sleep now.");
+    Serial.println("Going to sleep now.");
     esp_deep_sleep_start();
   }
   // Check if a minute (60,000 milliseconds) has passed since the last execution
