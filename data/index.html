@@ -27,8 +27,7 @@
   <div id="chart-pressure" class="container"></div>
   <input type="file" id="txt-file-input" accept=".txt">
 
-  <!-- Add a download button -->
-  <button id="downloadButton">Download CSV</button>
+  <button id="download-csv-button">Download CSV</button>
 
   <script>
     var chartT = new Highcharts.Chart({
@@ -54,24 +53,32 @@
       },
       credits: { enabled: false }
     });
-    document.getElementById("downloadButton").addEventListener("click", function() {
-  fetch("http://192.168.0.220/downloadCSV", { // Replace with your Arduino's endpoint URL
-    method: "GET",
-  })
-  .then(response => response.blob())
-  .then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "data.csv"; // The filename you want to give to the downloaded file
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-  })
-  .catch(error => {
-    console.error("Error downloading CSV:", error);
-  });
-});
+      // Handle the click event for the "Download CSV" button
+      document.getElementById("download-csv-button").addEventListener("click", function () {
+      // Make an HTTP GET request to the server's CSV endpoint
+      fetch('http://192.168.0.220/downloaddata')
+        .then(function (response) {
+          // Check if the response status is OK (200)
+          if (response.status === 200) {
+            // Create a blob from the response data
+            return response.blob();
+          } else {
+            throw new Error('Failed to download CSV file');
+          }
+        })
+        .then(function (blob) {
+          // Create a temporary anchor element to trigger the download
+          var a = document.createElement('a');
+          a.href = window.URL.createObjectURL(blob);
+          a.download = 'data.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        })
+        .catch(function (error) {
+          console.error(error);
+        });
+    });
   </script>
 </body>
 

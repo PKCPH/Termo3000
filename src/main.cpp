@@ -234,16 +234,17 @@ void setup()
             { request->send(SPIFFS, "/index.html"); });
   server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/plain", readBME280Temperature().c_str()); });
- server.on("/downloadCSV", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/downloaddata", HTTP_GET, [](AsyncWebServerRequest *request){
+  // Open the "data.csv" file for reading from the SD card
   File file = SD.open("/data.txt");
-  if (!file) {
-     request->send(404, "text/plain", "CSV file not found");
-     } else {
-      request->send(SD, "/data.txt", "text/csv", false);
-      file.close();
-    }
-  });
-
+  if (file) {
+    // Set the content type to CSV
+    request->send(SD, "/data.txt", "text/csv");
+    file.close();
+  } else {
+    request->send(404, "text/plain", "File not found");
+  }
+});
 
   // Start server
   server.begin();
@@ -254,30 +255,27 @@ void setup()
   // Start the DallasTemperature library
   sensors.begin();
 
+  //gets reading, timestamps and logs onto sdcard
   getReadings();
   getTimeStamp();
   logSDCard();
 
   // Increment readingID on every new reading
   readingID++;
-
-
-  Serial.println("ReadingId");
-  // Initialize your setup code here
-
   // Record the start time
   startMillis = millis();
 }
 
 void loop()
 {
-  Serial.println("Entering Loop");
+  
    // Check if the button is pressed
   if (digitalRead(BUTTON_PIN) == LOW)
   {
     // Button is pressed, initiate deep sleep
     Serial.println("Button pressed! Going to sleep now.");
     esp_deep_sleep_start();
+
   }
 
   // Check if 5 minutes (300,000 milliseconds) have passed
