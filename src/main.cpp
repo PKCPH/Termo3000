@@ -44,8 +44,10 @@ RTC_DATA_ATTR int readingID = 0;
 
 String dataMessage;
 
+unsigned long lastExecutionTime = 0;
+
 unsigned long startMillis;
-const unsigned long sleepDuration = 10000; // 5 minutes in milliseconds
+const unsigned long sleepDuration = 100000; // 5 minutes in milliseconds
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
@@ -103,33 +105,36 @@ void sendTemperatureToClients()
   ws.textAll(temperatureData);
 }
 
-// //besked fra client to server
-// void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-//   AwsFrameInfo *info = (AwsFrameInfo *)arg;
-//   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-//     // Handle WebSocket message here if needed
+// besked fra client to server
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
+{
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+  {
+    // Handle WebSocket message here if needed
+  }
+}
 
-//   }
-// }
-
-// //handler alle event der sker i websocket
-// void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
-//              void *arg, uint8_t *data, size_t len) {
-//   switch (type) {
-//     case WS_EVT_CONNECT:
-//       Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-//       break;
-//     case WS_EVT_DISCONNECT:
-//       Serial.printf("WebSocket client #%u disconnected\n", client->id());
-//       break;
-//     case WS_EVT_DATA:
-//       handleWebSocketMessage(arg, data, len);
-//       break;
-//     case WS_EVT_PONG:
-//     case WS_EVT_ERROR:
-//       break;
-//   }
-// }
+// handler alle event der sker i websocket
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+             void *arg, uint8_t *data, size_t len)
+{
+  switch (type)
+  {
+  case WS_EVT_CONNECT:
+    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    break;
+  case WS_EVT_DISCONNECT:
+    Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    break;
+  case WS_EVT_DATA:
+    handleWebSocketMessage(arg, data, len);
+    break;
+  case WS_EVT_PONG:
+  case WS_EVT_ERROR:
+    break;
+  }
+}
 
 // starter websocket
 void initWebSocket()
@@ -140,7 +145,7 @@ void initWebSocket()
 
 void setup()
 {
-// Initialize the button as a wakeup source
+  // Initialize the button as a wakeup source
   configureButtonWakeup();
 
   // Start the Serial Monitor
@@ -190,8 +195,6 @@ void setup()
 
   initWebSocket();
 
- 
-
   // Initialize SD card
   SD.begin(SD_CS);
   if (!SD.begin(SD_CS))
@@ -212,8 +215,6 @@ void setup()
     return; // init failed
   }
 
-
-
   // If the data.txt file doesn't exist
   // Create a file on the SD card and write the data labels
   File file = SD.open("/data.txt");
@@ -229,22 +230,39 @@ void setup()
   }
   file.close();
 
-   // Route for root / web page
+  // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(SPIFFS, "/index.html"); });
   server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/plain", readBME280Temperature().c_str()); });
-  server.on("/downloaddata", HTTP_GET, [](AsyncWebServerRequest *request){
-  // Open the "data.csv" file for reading from the SD card
-  File file = SD.open("/data.txt");
-  if (file) {
-    // Set the content type to CSV
-    request->send(SD, "/data.txt", "text/csv");
-    file.close();
+  server.on("/downloaddata", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              // Open the "data.csv" file for reading from the SD card
+              File file = SD.open("/data.txt");
+              if (file)
+              {
+                // Set the content type to CSV
+                request->send(SD, "/data.txt", "text/csv");
+                file.close();
+              }
+              else
+              {
+                request->send(404, "text/plain", "File not found");
+              }
+            });
+  server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request)
+            {
+  // Check if the file exists
+  if (SD.exists("/data.txt")) {
+    // Remove (delete) the file
+    if (SD.remove("/data.txt")) {
+      request->send(200, "text/plain", "Data cleared successfully");
+    } else {
+      request->send(500, "text/plain", "Failed to clear data");
+    }
   } else {
     request->send(404, "text/plain", "File not found");
-  }
-});
+  } });
 
   // Start server
   server.begin();
@@ -255,27 +273,26 @@ void setup()
   // Start the DallasTemperature library
   sensors.begin();
 
-  //gets reading, timestamps and logs onto sdcard
-  getReadings();
-  getTimeStamp();
-  logSDCard();
+  // //gets reading, timestamps and logs onto sdcard
+  // getReadings();
+  // getTimeStamp();
+  // logSDCard();
 
-  // Increment readingID on every new reading
-  readingID++;
+  // // Increment readingID on every new reading
+  // readingID++;
   // Record the start time
   startMillis = millis();
 }
 
 void loop()
 {
-  
-   // Check if the button is pressed
+
+  // Check if the button is pressed
   if (digitalRead(BUTTON_PIN) == LOW)
   {
     // Button is pressed, initiate deep sleep
     Serial.println("Button pressed! Going to sleep now.");
     esp_deep_sleep_start();
-
   }
 
   // Check if 5 minutes (300,000 milliseconds) have passed
@@ -285,7 +302,17 @@ void loop()
     Serial.println("DONE! Going to sleep now.");
     esp_deep_sleep_start();
   }
-  // Your other loop code (if any) can go here
+  // Check if a minute (60,000 milliseconds) has passed since the last execution
+  if (millis() - lastExecutionTime >= 12000)
+  {
+    // 1 minute has passed, so execute your code
+    getReadings();
+    getTimeStamp();
+    logSDCard();
+
+    // Update the last execution time
+    lastExecutionTime = millis();
+  }
 }
 
 // Function to get temperature
@@ -296,6 +323,7 @@ void getReadings()
   // temperature = sensors.getTempFByIndex(0); // Temperature in Fahrenheit
   Serial.print("Temperature: ");
   Serial.println(currentTemperature);
+  sendTemperatureToClients(); // sends temperature to clients
 }
 
 // Function to get date and time from NTPClient
@@ -367,6 +395,8 @@ void appendFile(fs::FS &fs, const char *path, const char *message)
 // Write the sensor readings on the SD card
 void logSDCard()
 {
+  // Increment readingID on every new reading
+  readingID++;
   dataMessage = String(readingID) + "," + String(dayStamp) + "," + String(timeStamp) + "," +
                 String(currentTemperature) + "\r\n";
   Serial.print("Save data: ");

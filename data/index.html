@@ -21,65 +21,101 @@
 </head>
 
 <body>
-  <h2>ESP Weather Station2</h2>
+  <h2>ESP Weather Station3</h2>
   <div id="chart-temperature" class="container"></div>
   <div id="chart-humidity" class="container"></div>
   <div id="chart-pressure" class="container"></div>
-  <input type="file" id="txt-file-input" accept=".txt">
-
   <button id="download-csv-button">Download CSV</button>
+  <button id="clear-csv-button">Clear CSV Data</button>
 
   <script>
-    var chartT = new Highcharts.Chart({
-      chart: { renderTo: 'chart-temperature' },
-      title: { text: 'BME280 Temperature' },
-      series: [{
-        showInLegend: false,
-        data: []
-      }],
-      plotOptions: {
-        line: {
-          animation: false,
-          dataLabels: { enabled: true }
+      var chartT = new Highcharts.Chart({
+        chart: { renderTo: 'chart-temperature' },
+        title: { text: 'BME280 Temperature' },
+        series: [{
+          showInLegend: false,
+          data: []
+        }],
+        plotOptions: {
+          line: {
+            animation: false,
+            dataLabels: { enabled: true }
+          },
+          series: { color: '#059e8a' }
         },
-        series: { color: '#059e8a' }
-      },
-      xAxis: {
-        type: 'datetime',
-        dateTimeLabelFormats: { second: '%H:%M:%S' }
-      },
-      yAxis: {
-        title: { text: 'Temperature (Celsius)' }
-      },
-      credits: { enabled: false }
-    });
+        xAxis: {
+          type: 'datetime',
+          dateTimeLabelFormats: { second: '%H:%M:%S' }
+        },
+        yAxis: {
+          title: { text: 'Temperature (Celsius)' }
+        },
+        credits: { enabled: false }
+      });
+
+      var ws = new WebSocket("ws://192.168.0.220/ws"); // WebSocket connection
+
+      ws.addEventListener("close", function () {
+        console.log("WebSocket connection closed.");
+      });
+
+      ws.addEventListener("open", function () {
+        console.log("WebSocket connection opened.");
+      });
+
+      ws.addEventListener("message", function (event) {
+        var temperature = parseFloat(event.data);
+        if (!isNaN(temperature)) {
+          var timestamp = new Date().getTime();
+          chartT.series[0].addPoint([timestamp, temperature]);
+        }
+      });
+
       // Handle the click event for the "Download CSV" button
       document.getElementById("download-csv-button").addEventListener("click", function () {
-      // Make an HTTP GET request to the server's CSV endpoint
-      fetch('http://192.168.0.220/downloaddata')
+        // Make an HTTP GET request to the server's CSV endpoint
+        fetch('http://192.168.0.220/downloaddata')
+          .then(function (response) {
+            // Check if the response status is OK (200)
+            if (response.status === 200) {
+              // Create a blob from the response data
+              return response.blob();
+            } else {
+              throw new Error('Failed to download CSV file');
+            }
+          })
+          .then(function (blob) {
+            // Create a temporary anchor element to trigger the download
+            var a = document.createElement('a');
+            a.href = window.URL.createObjectURL(blob);
+            a.download = 'data.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          })
+          .catch(function (error) {
+            console.error(error);
+          });
+      });
+
+       // Handle the click event for the "Clear CSV Data" button
+    document.getElementById("clear-csv-button").addEventListener("click", function () {
+      // Make an HTTP GET request to the server's clear data endpoint
+      fetch('http://192.168.0.220/cleardata', { method: 'POST' })
         .then(function (response) {
           // Check if the response status is OK (200)
           if (response.status === 200) {
-            // Create a blob from the response data
-            return response.blob();
+            console.log('CSV data cleared successfully.');
           } else {
-            throw new Error('Failed to download CSV file');
+            throw new Error('Failed to clear CSV data');
           }
-        })
-        .then(function (blob) {
-          // Create a temporary anchor element to trigger the download
-          var a = document.createElement('a');
-          a.href = window.URL.createObjectURL(blob);
-          a.download = 'data.csv';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
         })
         .catch(function (error) {
           console.error(error);
         });
     });
   </script>
+
 </body>
 
 </html>
