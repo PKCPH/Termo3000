@@ -47,7 +47,9 @@
       },
       xAxis: {
         type: 'datetime',
-        dateTimeLabelFormats: { second: '%H:%M:%S' }
+        dateTimeLabelFormats: { second: '%H:%M:%S' },
+        // Use the browser's timezone offset
+        timezoneOffset: new Date().getTimezoneOffset()
       },
       yAxis: {
         title: { text: 'Temperature (Celsius)' }
@@ -82,7 +84,7 @@
             }
 
             var historicalData = results.data;
-            console.log("Parsed CSV data:", historicalData);
+            //console.log("Parsed CSV data:", historicalData);
 
             historicalData.forEach(function (item, index) {
               if (item.length === 4 && item[1] && item[2] && item[3]) {

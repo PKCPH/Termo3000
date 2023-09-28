@@ -162,7 +162,7 @@ void setup()
   // GMT +8 = 28800
   // GMT -1 = -3600
   // GMT 0 = 0
-  timeClient.setTimeOffset(3600);
+  timeClient.setTimeOffset(7200);
 
   // Start the DS18B20 sensor
   sensors.begin();
@@ -269,7 +269,6 @@ server.on("/loaddata", HTTP_GET, [](AsyncWebServerRequest *request)
     if (file)
     {
         String historicalData = file.readString();
-        Serial.println(historicalData);
         file.close();
         // Send the historical data as a response
         request->send(200, "application/json", historicalData);
