@@ -4,6 +4,8 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
   <style>
     body {
       min-width: 310px;
@@ -53,7 +55,7 @@
       credits: { enabled: false }
     });
 
-    // Function to add data points to the chart
+
     function addDataPoint(timestamp, temperature) {
       chartT.series[0].addPoint([timestamp, temperature]);
     }
@@ -63,24 +65,44 @@
       .then(function (response) {
         // Check if the response status is OK (200)
         if (response.status === 200) {
-          console.log(response.json());
-          console.log(response);
-          return response.json(); // Assuming the data is in JSON format
+          return response.text(); // Read the CSV data as text
         } else {
           throw new Error('Failed to load historical data');
         }
       })
-      .then(function (data) {
-        console.log("datalog: " + data);
-        // Loop through the historical data and add it to the chart
-        data.forEach(function (item) {
-          addDataPoint(item.timestamp, item.temperature);
-          console.log("foreach datapoint:" + item.timestamp +  item.temperature)
+      .then(function (csvData) {
+        // Parse the CSV data using papaparse
+        Papa.parse(csvData, {
+          header: false, // Assumes the first row contains headers
+          dynamicTyping: false, // Automatically convert values to numbers if possible
+          complete: function (results) {
+            if (results.errors.length > 0) {
+              // Log any parsing errors
+              console.error("CSV Parsing Errors:", results.errors);
+            }
+
+            var historicalData = results.data;
+            console.log("Parsed CSV data:", historicalData);
+
+            historicalData.forEach(function (item, index) {
+              if (item.length === 4 && item[1] && item[2] && item[3]) {
+                // Combine the date and time to create a complete timestamp
+                var dateTimeString = item[1] + " " + item[2];
+                var timestamp = new Date(dateTimeString).getTime();
+                var temperatureFloat = parseFloat(item[3]);
+                addDataPoint(timestamp, temperatureFloat);
+                console.log("Processed row " + index + ":", timestamp, item[3]);
+              } else {
+                console.error("Invalid CSV row at index " + index + ":", item);
+              }
+            });
+          },
         });
       })
       .catch(function (error) {
         console.error(error);
       });
+
 
 
     var ws = new WebSocket("ws://192.168.0.220/ws"); // WebSocket connection
