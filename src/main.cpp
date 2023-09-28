@@ -174,13 +174,13 @@ void setup()
     return;
   }
 
-  // Connect to Wi-Fi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(1000);
-    Serial.println("Connecting to WiFi..");
-  }
+  // // Connect to Wi-Fi
+  // WiFi.begin(ssid, password);
+  // while (WiFi.status() != WL_CONNECTED)
+  // {
+  //   delay(1000);
+  //   Serial.println("Connecting to WiFi..");
+  // }
 
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
@@ -222,7 +222,7 @@ void setup()
   }
   file.close();
 
-  // Route for root / web page
+  // Endpoints
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(SPIFFS, "/index.html"); });
   server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -262,6 +262,23 @@ server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "File not found");
   }
 });
+server.on("/loaddata", HTTP_GET, [](AsyncWebServerRequest *request)
+{
+    // Read historical data from the SD card file
+    File file = SD.open("/data.txt", FILE_READ); // Assuming the data is stored in "/data.txt"
+    if (file)
+    {
+        String historicalData = file.readString();
+        Serial.println(historicalData);
+        file.close();
+        // Send the historical data as a response
+        request->send(200, "application/json", historicalData);
+    }
+    else
+    {
+        request->send(404, "text/plain", "File not found");
+    }
+});
 
   // Start server
   server.begin();
@@ -286,7 +303,7 @@ void loop()
     esp_deep_sleep_start();
   }
   // Check if a 10 seconds has passed since the last execution
-  if (millis() - lastExecutionTime >= 12000)
+  if (millis() - lastExecutionTime >= 6000)
   {
     // 1 minute has passed, so execute your code
     getReadings();

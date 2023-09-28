@@ -29,77 +29,111 @@
   <button id="clear-csv-button">Clear CSV Data</button>
 
   <script>
-      var chartT = new Highcharts.Chart({
-        chart: { renderTo: 'chart-temperature' },
-        title: { text: 'BME280 Temperature' },
-        series: [{
-          showInLegend: false,
-          data: []
-        }],
-        plotOptions: {
-          line: {
-            animation: false,
-            dataLabels: { enabled: true }
-          },
-          series: { color: '#059e8a' }
+    var chartT = new Highcharts.Chart({
+      chart: { renderTo: 'chart-temperature' },
+      title: { text: 'BME280 Temperature' },
+      series: [{
+        showInLegend: false,
+        data: []
+      }],
+      plotOptions: {
+        line: {
+          animation: false,
+          dataLabels: { enabled: true }
         },
-        xAxis: {
-          type: 'datetime',
-          dateTimeLabelFormats: { second: '%H:%M:%S' }
-        },
-        yAxis: {
-          title: { text: 'Temperature (Celsius)' }
-        },
-        credits: { enabled: false }
-      });
+        series: { color: '#059e8a' }
+      },
+      xAxis: {
+        type: 'datetime',
+        dateTimeLabelFormats: { second: '%H:%M:%S' }
+      },
+      yAxis: {
+        title: { text: 'Temperature (Celsius)' }
+      },
+      credits: { enabled: false }
+    });
 
-      var ws = new WebSocket("ws://192.168.0.220/ws"); // WebSocket connection
+    // Function to add data points to the chart
+    function addDataPoint(timestamp, temperature) {
+      chartT.series[0].addPoint([timestamp, temperature]);
+    }
 
-      ws.addEventListener("close", function () {
-        console.log("WebSocket connection closed.");
-      });
-
-      ws.addEventListener("open", function () {
-        console.log("WebSocket connection opened.");
-      });
-
-      ws.addEventListener("message", function (event) {
-        var temperature = parseFloat(event.data);
-        if (!isNaN(temperature)) {
-          var timestamp = new Date().getTime();
-          chartT.series[0].addPoint([timestamp, temperature]);
+    // Load historical data from the SD card file
+    fetch('http://192.168.0.220/loaddata')
+      .then(function (response) {
+        // Check if the response status is OK (200)
+        if (response.status === 200) {
+          console.log(response.json());
+          console.log(response);
+          return response.json(); // Assuming the data is in JSON format
+        } else {
+          throw new Error('Failed to load historical data');
         }
+      })
+      .then(function (data) {
+        console.log("datalog: " + data);
+        // Loop through the historical data and add it to the chart
+        data.forEach(function (item) {
+          addDataPoint(item.timestamp, item.temperature);
+          console.log("foreach datapoint:" + item.timestamp +  item.temperature)
+        });
+      })
+      .catch(function (error) {
+        console.error(error);
       });
 
-      // Handle the click event for the "Download CSV" button
-      document.getElementById("download-csv-button").addEventListener("click", function () {
-        // Make an HTTP GET request to the server's CSV endpoint
-        fetch('http://192.168.0.220/downloaddata')
-          .then(function (response) {
-            // Check if the response status is OK (200)
-            if (response.status === 200) {
-              // Create a blob from the response data
-              return response.blob();
-            } else {
-              throw new Error('Failed to download CSV file');
-            }
-          })
-          .then(function (blob) {
-            // Create a temporary anchor element to trigger the download
-            var a = document.createElement('a');
-            a.href = window.URL.createObjectURL(blob);
-            a.download = 'data.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          })
-          .catch(function (error) {
-            console.error(error);
-          });
-      });
 
-       // Handle the click event for the "Clear CSV Data" button
+    var ws = new WebSocket("ws://192.168.0.220/ws"); // WebSocket connection
+
+    ws.addEventListener("close", function () {
+      console.log("WebSocket connection closed.");
+    });
+
+    ws.addEventListener("open", function () {
+      console.log("WebSocket connection opened.");
+    });
+
+    ws.addEventListener("message", function (event) {
+      var temperature = parseFloat(event.data);
+      if (!isNaN(temperature)) {
+        var timestamp = new Date().getTime();
+        addDataPoint(timestamp, temperature); // Add new data to the chart
+        //chartT.series[0].addPoint([timestamp, temperature])
+        //chartT.series[0].addPoint([timestamp, temperature]);
+      }
+    });
+
+    // Handle the click event for the "Download CSV" button
+    document.getElementById("download-csv-button").addEventListener("click", function () {
+      // Make an HTTP GET request to the server's CSV endpoint
+      fetch('http://192.168.0.220/downloaddata')
+        .then(function (response) {
+          // Check if the response status is OK (200)
+          if (response.status === 200) {
+            // Create a blob from the response data
+            return response.blob();
+          } else {
+            throw new Error('Failed to download CSV file');
+          }
+        })
+        .then(function (blob) {
+          // Create a temporary anchor element to trigger the download
+          var a = document.createElement('a');
+          a.href = window.URL.createObjectURL(blob);
+          a.download = 'data.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        })
+        .catch(function (error) {
+          console.error(error);
+        });
+    });
+
+    // Handle the click event for the "Clear CSV Data" button
     document.getElementById("clear-csv-button").addEventListener("click", function () {
+      // Clear the chart data
+      chartT.series[0].setData([], false);
       // Make an HTTP GET request to the server's clear data endpoint
       fetch('http://192.168.0.220/cleardata', { method: 'POST' })
         .then(function (response) {
