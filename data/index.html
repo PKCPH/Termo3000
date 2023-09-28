@@ -103,8 +103,6 @@
         console.error(error);
       });
 
-
-
     var ws = new WebSocket("ws://192.168.0.220/ws"); // WebSocket connection
 
     ws.addEventListener("close", function () {
@@ -120,8 +118,6 @@
       if (!isNaN(temperature)) {
         var timestamp = new Date().getTime();
         addDataPoint(timestamp, temperature); // Add new data to the chart
-        //chartT.series[0].addPoint([timestamp, temperature])
-        //chartT.series[0].addPoint([timestamp, temperature]);
       }
     });
 
