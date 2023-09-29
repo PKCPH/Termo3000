@@ -1,17 +1,16 @@
+/**
+ * @file main.cpp
+ * @brief ESP32-based temperature monitoring and data logging system using DS18B20 sensor.
+ */
+
 #include <Arduino.h>
-// DS18B20 libraries
 #include <OneWire.h>
 #include <DallasTemperature.h>
-
-// Libraries to get time from NTP Server
 #include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
-
-// Libraries for SD card
 #include <FS.h>
 #include <SD.h>
 #include <SPI.h>
@@ -69,6 +68,9 @@ AsyncWebSocket ws("/ws");
 
 #define BUTTON_PIN 14
 
+/**
+ * @brief Configure the button for wake-up.
+ */
 void configureButtonWakeup()
 {
   // Configure the button pin as an RTC wake-up source
@@ -76,6 +78,10 @@ void configureButtonWakeup()
   // Set the wake-up level to LOW, so the button press triggers the wake-up
 }
 
+/**
+ * @brief Read the temperature from the DS18B20 sensor and return it as a string.
+ * @return String representation of the current temperature.
+ */
 String readBME280Temperature()
 {
   // Read temperature as Celsius (the default)
@@ -91,13 +97,21 @@ String readBME280Temperature()
   return String(currentTemperature);
 }
 
+/**
+ * @brief Send the current temperature to WebSocket clients.
+ */
 void sendTemperatureToClients()
 {
   String temperatureData = String(currentTemperature);
   ws.textAll(temperatureData);
 }
 
-// Message from client to server
+/**
+ * @brief Handle WebSocket messages from clients.
+ * @param arg Pointer to WebSocket frame information.
+ * @param data Pointer to the message data.
+ * @param len Length of the message data.
+ */
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 {
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
@@ -107,7 +121,15 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
   }
 }
 
-// Handle all events that occur in the WebSocket
+/**
+ * @brief Handle WebSocket events.
+ * @param server Pointer to the WebSocket server.
+ * @param client Pointer to the WebSocket client.
+ * @param type Type of WebSocket event.
+ * @param arg Pointer to event-specific data.
+ * @param data Pointer to event data.
+ * @param len Length of event data.
+ */
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
              void *arg, uint8_t *data, size_t len)
 {
@@ -128,13 +150,18 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   }
 }
 
-// Initialize WebSocket
+/**
+ * @brief Initialize WebSocket communication.
+ */
 void initWebSocket()
 {
   ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
 
+/**
+ * @brief Setup function.
+ */
 void setup()
 {
   // Initialize the button as a wakeup source
@@ -173,14 +200,6 @@ void setup()
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
-
-  // // Connect to Wi-Fi
-  // WiFi.begin(ssid, password);
-  // while (WiFi.status() != WL_CONNECTED)
-  // {
-  //   delay(1000);
-  //   Serial.println("Connecting to WiFi..");
-  // }
 
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
@@ -242,42 +261,43 @@ void setup()
                 request->send(404, "text/plain", "File not found");
               }
             });
-server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request){
-  // Check if the file exists
-  if (SD.exists("/data.txt")) {
-    // Remove (delete) the file
-    if (SD.remove("/data.txt")) {
-      // Create a new empty file with the same name
-      File newFile = SD.open("/data.txt", FILE_WRITE);
-      if (newFile) {
-        newFile.close();
-        request->send(200, "text/plain", "Data cleared successfully");
+  server.on("/cleardata", HTTP_POST, [](AsyncWebServerRequest *request)
+  {
+    // Check if the file exists
+    if (SD.exists("/data.txt")) {
+      // Remove (delete) the file
+      if (SD.remove("/data.txt")) {
+        // Create a new empty file with the same name
+        File newFile = SD.open("/data.txt", FILE_WRITE);
+        if (newFile) {
+          newFile.close();
+          request->send(200, "text/plain", "Data cleared successfully");
+        } else {
+          request->send(500, "text/plain", "Failed to create new data file");
+        }
       } else {
-        request->send(500, "text/plain", "Failed to create new data file");
+        request->send(500, "text/plain", "Failed to clear data");
       }
     } else {
-      request->send(500, "text/plain", "Failed to clear data");
+      request->send(404, "text/plain", "File not found");
     }
-  } else {
-    request->send(404, "text/plain", "File not found");
-  }
-});
-server.on("/loaddata", HTTP_GET, [](AsyncWebServerRequest *request)
-{
-    // Read historical data from the SD card file
-    File file = SD.open("/data.txt", FILE_READ); // Assuming the data is stored in "/data.txt"
-    if (file)
-    {
-        String historicalData = file.readString();
-        file.close();
-        // Send the historical data as a response
-        request->send(200, "application/json", historicalData);
-    }
-    else
-    {
-        request->send(404, "text/plain", "File not found");
-    }
-});
+  });
+  server.on("/loaddata", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+      // Read historical data from the SD card file
+      File file = SD.open("/data.txt", FILE_READ); // Assuming the data is stored in "/data.txt"
+      if (file)
+      {
+          String historicalData = file.readString();
+          file.close();
+          // Send the historical data as a response
+          request->send(200, "application/json", historicalData);
+      }
+      else
+      {
+          request->send(404, "text/plain", "File not found");
+      }
+  });
 
   // Start server
   server.begin();
@@ -292,6 +312,9 @@ server.on("/loaddata", HTTP_GET, [](AsyncWebServerRequest *request)
   startMillis = millis();
 }
 
+/**
+ * @brief Main loop function.
+ */
 void loop()
 {
   // Check if 5 minutes (300,000 milliseconds) have passed or button is pressed
@@ -301,10 +324,10 @@ void loop()
     Serial.println("Going to sleep now.");
     esp_deep_sleep_start();
   }
-  // Check if a 10 seconds has passed since the last execution
-  if (millis() - lastExecutionTime >= 6000)
+  // Check if 10 seconds have passed since the last execution
+  if (millis() - lastExecutionTime >= 10000)
   {
-    // 1 minute has passed, so execute your code
+    // 10 seconds have passed, so execute your code
     getReadings();
     getTimeStamp();
     logSDCard();
@@ -314,18 +337,21 @@ void loop()
   }
 }
 
-// Function to get temperature
+/**
+ * @brief Get temperature readings from the DS18B20 sensor.
+ */
 void getReadings()
 {
   sensors.requestTemperatures();
   currentTemperature = sensors.getTempCByIndex(0); // Temperature in Celsius
-  // temperature = sensors.getTempFByIndex(0); // Temperature in Fahrenheit
   Serial.print("Temperature: ");
   Serial.println(currentTemperature);
   sendTemperatureToClients(); // sends temperature to clients
 }
 
-// Function to get date and time from NTPClient
+/**
+ * @brief Get the current date and time from an NTP server.
+ */
 void getTimeStamp()
 {
   while (!timeClient.update())
@@ -347,7 +373,12 @@ void getTimeStamp()
   Serial.println(timeStamp);
 }
 
-// Write to the SD card (DON'T MODIFY THIS FUNCTION)
+/**
+ * @brief Write data to the SD card.
+ * @param fs File system instance.
+ * @param path Path to the file.
+ * @param message Data to be written.
+ */
 void writeFile(fs::FS &fs, const char *path, const char *message)
 {
   Serial.printf("Writing file: %s\n", path);
@@ -369,7 +400,12 @@ void writeFile(fs::FS &fs, const char *path, const char *message)
   file.close();
 }
 
-// Append data to the SD card (DON'T MODIFY THIS FUNCTION)
+/**
+ * @brief Append data to the SD card.
+ * @param fs File system instance.
+ * @param path Path to the file.
+ * @param message Data to be appended.
+ */
 void appendFile(fs::FS &fs, const char *path, const char *message)
 {
   Serial.printf("Appending to file: %s\n", path);
@@ -391,7 +427,9 @@ void appendFile(fs::FS &fs, const char *path, const char *message)
   file.close();
 }
 
-// Write the sensor readings on the SD card
+/**
+ * @brief Log temperature and other data to the SD card.
+ */
 void logSDCard()
 {
   // Increment readingID on every new reading
